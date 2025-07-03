@@ -1,0 +1,40 @@
+{
+  "configurations" : [
+    {
+      "id" : "E0E4835A-242E-46C2-94E5-2DD940F8D789",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:QuakeWatch.xcodeproj",
+      "identifier" : "1FEECC022E172F2100205B39",
+      "name" : "QuakeWatch"
+    },
+    "testExecutionOrdering" : "random"
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : false,
+      "selectedTests" : {
+        "suites" : [
+          {
+            "name" : "QuakeWatchTests",
+            "testFunctions" : [
+              "example()"
+            ]
+          }
+        ]
+      },
+      "target" : {
+        "containerPath" : "container:QuakeWatch.xcodeproj",
+        "identifier" : "1FEECC0F2E172F2400205B39",
+        "name" : "QuakeWatchTests"
+      }
+    }
+  ],
+  "version" : 1
+}
