@@ -10,12 +10,45 @@ import ComposableArchitecture
 
 struct ContentView: View {
     var body: some View {
-        NavigationView {
-            EarthquakeListView(
-                store: Store(initialState: EarthquakeListFeature.State()) {
-                    EarthquakeListFeature()
+        RootView(
+            store: Store(initialState: RootFeature.State()) {
+                RootFeature()
+            }
+        )
+    }
+}
+
+struct RootView: View {
+    let store: StoreOf<RootFeature>
+    
+    var body: some View {
+        WithViewStore(store, observe: { $0 }) { viewStore in
+            TabView(selection: Binding(
+                get: { viewStore.selectedTab },
+                set: { viewStore.send(.tabSelected($0)) }
+            )) {
+                NavigationView {
+                    EarthquakeListView(
+                        store: store.scope(state: \.earthquakeList, action: \.earthquakeList)
+                    )
                 }
-            )
+                .tabItem {
+                    Image(systemName: "list.bullet")
+                    Text("List")
+                }
+                .tag(RootFeature.State.Tab.list)
+                
+                NavigationView {
+                    EarthquakeMapView(
+                        store: store.scope(state: \.earthquakeMap, action: \.earthquakeMap)
+                    )
+                }
+                .tabItem {
+                    Image(systemName: "map")
+                    Text("Map")
+                }
+                .tag(RootFeature.State.Tab.map)
+            }
         }
     }
 }

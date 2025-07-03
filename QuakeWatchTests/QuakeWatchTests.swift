@@ -8,6 +8,7 @@
 import Testing
 import ComposableArchitecture
 import Foundation
+import MapKit
 @testable import QuakeWatch
 
 @MainActor
@@ -448,5 +449,186 @@ struct QuakeWatchTests {
             ),
             id: "test-earthquake-\(magnitude)-\(location.replacingOccurrences(of: " ", with: "-"))"
         )
+    }
+    
+    // MARK: - Map Feature Tests
+    
+    @Test func earthquakeMapFeatureOnAppear() async throws {
+        let store = TestStore(initialState: EarthquakeMapFeature.State()) {
+            EarthquakeMapFeature()
+        } withDependencies: {
+            $0.earthquakeClient = .testValue
+        }
+        
+        await store.send(.onAppear) {
+            $0.isLoading = true
+        }
+        
+        await store.receive(\.earthquakesResponse.success) {
+            $0.isLoading = false
+            $0.earthquakes = [
+                Earthquake(from: EarthquakeFeature(
+                    type: "Feature",
+                    properties: EarthquakeProperties(
+                        mag: 4.5,
+                        place: "Test Location",
+                        time: Int(Date().timeIntervalSince1970 * 1000),
+                        updated: Int(Date().timeIntervalSince1970 * 1000),
+                        tz: nil,
+                        url: "https://test.com",
+                        detail: "https://test.com/detail",
+                        felt: nil,
+                        cdi: nil,
+                        mmi: nil,
+                        alert: nil,
+                        status: "reviewed",
+                        tsunami: 0,
+                        sig: 314,
+                        net: "ci",
+                        code: "12345",
+                        ids: ",ci12345,",
+                        sources: ",ci,",
+                        types: ",general-link,origin,phase-data,",
+                        nst: nil,
+                        dmin: nil,
+                        rms: nil,
+                        gap: nil,
+                        magType: "ml",
+                        type: "earthquake",
+                        title: "Test Earthquake"
+                    ),
+                    geometry: EarthquakeGeometry(
+                        type: "Point",
+                        coordinates: [-118.123, 34.123, 10.0]
+                    ),
+                    id: "test-earthquake-1"
+                ))
+            ]
+            $0.lastUpdated = Date()
+            // Map region should be updated to show the earthquake
+            $0.mapRegion.center.latitude = 34.123
+            $0.mapRegion.center.longitude = -118.123
+        }
+    }
+    
+    @Test func earthquakeMapFeatureRefresh() async throws {
+        let store = TestStore(initialState: EarthquakeMapFeature.State()) {
+            EarthquakeMapFeature()
+        } withDependencies: {
+            $0.earthquakeClient = .testValue
+        }
+        
+        await store.send(.refresh) {
+            $0.isLoading = true
+        }
+        
+        await store.receive(\.earthquakesResponse.success) {
+            $0.isLoading = false
+            $0.earthquakes = [
+                Earthquake(from: EarthquakeFeature(
+                    type: "Feature",
+                    properties: EarthquakeProperties(
+                        mag: 4.5,
+                        place: "Test Location",
+                        time: Int(Date().timeIntervalSince1970 * 1000),
+                        updated: Int(Date().timeIntervalSince1970 * 1000),
+                        tz: nil,
+                        url: "https://test.com",
+                        detail: "https://test.com/detail",
+                        felt: nil,
+                        cdi: nil,
+                        mmi: nil,
+                        alert: nil,
+                        status: "reviewed",
+                        tsunami: 0,
+                        sig: 314,
+                        net: "ci",
+                        code: "12345",
+                        ids: ",ci12345,",
+                        sources: ",ci,",
+                        types: ",general-link,origin,phase-data,",
+                        nst: nil,
+                        dmin: nil,
+                        rms: nil,
+                        gap: nil,
+                        magType: "ml",
+                        type: "earthquake",
+                        title: "Test Earthquake"
+                    ),
+                    geometry: EarthquakeGeometry(
+                        type: "Point",
+                        coordinates: [-118.123, 34.123, 10.0]
+                    ),
+                    id: "test-earthquake-1"
+                ))
+            ]
+            $0.lastUpdated = Date()
+            $0.mapRegion.center.latitude = 34.123
+            $0.mapRegion.center.longitude = -118.123
+        }
+    }
+    
+    @Test func earthquakeMapFeatureError() async throws {
+        struct TestError: Error, Equatable {
+            let message = "Test error"
+        }
+        
+        let store = TestStore(initialState: EarthquakeMapFeature.State()) {
+            EarthquakeMapFeature()
+        } withDependencies: {
+            $0.earthquakeClient.fetchEarthquakes = { throw TestError() }
+        }
+        
+        await store.send(.refresh) {
+            $0.isLoading = true
+        }
+        
+        await store.receive(\.earthquakesResponse.failure) {
+            $0.isLoading = false
+            $0.errorMessage = "Failed to load earthquakes: Test error"
+        }
+    }
+    
+    @Test func earthquakeMapFeatureEarthquakeSelection() async throws {
+        let earthquake = Earthquake(from: createTestFeature(magnitude: 4.5))
+        let store = TestStore(initialState: EarthquakeMapFeature.State()) {
+            EarthquakeMapFeature()
+        } withDependencies: {
+            $0.earthquakeClient = .testValue
+        }
+        
+        await store.send(.earthquakeSelected(earthquake)) {
+            $0.selectedEarthquake = earthquake
+            $0.earthquakeDetail = EarthquakeDetailFeature.State(earthquake: earthquake)
+        }
+    }
+    
+    
+    // MARK: - Root Feature Tests
+    
+    @Test func rootFeatureTabSelection() async throws {
+        let store = TestStore(initialState: RootFeature.State()) {
+            RootFeature()
+        }
+        
+        #expect(store.state.selectedTab == .list)
+        
+        await store.send(.tabSelected(.map)) {
+            $0.selectedTab = .map
+        }
+        
+        await store.send(.tabSelected(.list)) {
+            $0.selectedTab = .list
+        }
+    }
+    
+    @Test func rootFeatureInitialState() async throws {
+        let state = RootFeature.State()
+        
+        #expect(state.selectedTab == .list)
+        #expect(state.earthquakeList.earthquakes.isEmpty)
+        #expect(state.earthquakeMap.earthquakes.isEmpty)
+        #expect(state.earthquakeList.isLoading == false)
+        #expect(state.earthquakeMap.isLoading == false)
     }
 }
