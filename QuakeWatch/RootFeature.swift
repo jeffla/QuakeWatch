@@ -15,10 +15,12 @@ struct RootFeature {
         var selectedTab: Tab = .list
         var earthquakeList = EarthquakeListFeature.State()
         var earthquakeMap = EarthquakeMapFeature.State()
+        var settings = SettingsFeature.State()
         
         enum Tab: String, CaseIterable {
             case list = "List"
             case map = "Map"
+            case settings = "Settings"
         }
     }
     
@@ -26,6 +28,7 @@ struct RootFeature {
         case tabSelected(State.Tab)
         case earthquakeList(EarthquakeListFeature.Action)
         case earthquakeMap(EarthquakeMapFeature.Action)
+        case settings(SettingsFeature.Action)
     }
     
     var body: some ReducerOf<Self> {
@@ -35,6 +38,10 @@ struct RootFeature {
         
         Scope(state: \.earthquakeMap, action: \.earthquakeMap) {
             EarthquakeMapFeature()
+        }
+        
+        Scope(state: \.settings, action: \.settings) {
+            SettingsFeature()
         }
         
         Reduce { state, action in
@@ -47,6 +54,9 @@ struct RootFeature {
                 return .none
                 
             case .earthquakeMap:
+                return .none
+                
+            case .settings:
                 return .none
             }
         }

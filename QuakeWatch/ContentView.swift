@@ -48,6 +48,17 @@ struct RootView: View {
                     Text("Map")
                 }
                 .tag(RootFeature.State.Tab.map)
+                
+                NavigationView {
+                    SettingsView(
+                        store: store.scope(state: \.settings, action: \.settings)
+                    )
+                }
+                .tabItem {
+                    Image(systemName: "gearshape")
+                    Text("Settings")
+                }
+                .tag(RootFeature.State.Tab.settings)
             }
         }
     }

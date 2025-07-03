@@ -631,4 +631,117 @@ struct QuakeWatchTests {
         #expect(state.earthquakeList.isLoading == false)
         #expect(state.earthquakeMap.isLoading == false)
     }
+    
+    // MARK: - Settings Feature Tests
+    
+    @Test func settingsFeatureInitialState() async throws {
+        let state = SettingsFeature.State()
+        
+        #expect(state.refreshInterval == .fiveMinutes)
+        #expect(state.notificationThreshold == 5.0)
+        #expect(state.showMagnitudeLabels == true)
+        #expect(state.useMetricUnits == false)
+        #expect(state.showMinorEarthquakes == true)
+        #expect(state.autoRefresh == true)
+    }
+    
+    @Test func settingsFeatureSetRefreshInterval() async throws {
+        let store = TestStore(initialState: SettingsFeature.State()) {
+            SettingsFeature()
+        }
+        
+        await store.send(.setRefreshInterval(.tenMinutes)) {
+            $0.refreshInterval = .tenMinutes
+        }
+        
+        await store.send(.setRefreshInterval(.oneHour)) {
+            $0.refreshInterval = .oneHour
+        }
+    }
+    
+    @Test func settingsFeatureSetNotificationThreshold() async throws {
+        let store = TestStore(initialState: SettingsFeature.State()) {
+            SettingsFeature()
+        }
+        
+        await store.send(.setNotificationThreshold(6.5)) {
+            $0.notificationThreshold = 6.5
+        }
+        
+        await store.send(.setNotificationThreshold(2.0)) {
+            $0.notificationThreshold = 2.0
+        }
+    }
+    
+    @Test func settingsFeatureToggleActions() async throws {
+        let store = TestStore(initialState: SettingsFeature.State()) {
+            SettingsFeature()
+        }
+        
+        await store.send(.toggleMagnitudeLabels) {
+            $0.showMagnitudeLabels = false
+        }
+        
+        await store.send(.toggleMagnitudeLabels) {
+            $0.showMagnitudeLabels = true
+        }
+        
+        await store.send(.toggleMetricUnits) {
+            $0.useMetricUnits = true
+        }
+        
+        await store.send(.toggleMinorEarthquakes) {
+            $0.showMinorEarthquakes = false
+        }
+        
+        await store.send(.toggleAutoRefresh) {
+            $0.autoRefresh = false
+        }
+    }
+    
+    @Test func settingsFeatureResetToDefaults() async throws {
+        var initialState = SettingsFeature.State()
+        initialState.refreshInterval = .oneHour
+        initialState.notificationThreshold = 7.0
+        initialState.showMagnitudeLabels = false
+        initialState.useMetricUnits = true
+        initialState.showMinorEarthquakes = false
+        initialState.autoRefresh = false
+        
+        let store = TestStore(initialState: initialState) {
+            SettingsFeature()
+        }
+        
+        await store.send(.resetToDefaults) {
+            $0 = SettingsFeature.State()
+        }
+    }
+    
+    @Test func settingsRefreshIntervalTimeValues() async throws {
+        #expect(SettingsFeature.State.RefreshInterval.oneMinute.timeInterval == 60)
+        #expect(SettingsFeature.State.RefreshInterval.fiveMinutes.timeInterval == 300)
+        #expect(SettingsFeature.State.RefreshInterval.tenMinutes.timeInterval == 600)
+        #expect(SettingsFeature.State.RefreshInterval.thirtyMinutes.timeInterval == 1800)
+        #expect(SettingsFeature.State.RefreshInterval.oneHour.timeInterval == 3600)
+    }
+    
+    @Test func rootFeatureSettingsTabSelection() async throws {
+        let store = TestStore(initialState: RootFeature.State()) {
+            RootFeature()
+        }
+        
+        #expect(store.state.selectedTab == .list)
+        
+        await store.send(.tabSelected(.settings)) {
+            $0.selectedTab = .settings
+        }
+        
+        await store.send(.tabSelected(.map)) {
+            $0.selectedTab = .map
+        }
+        
+        await store.send(.tabSelected(.list)) {
+            $0.selectedTab = .list
+        }
+    }
 }
