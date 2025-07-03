@@ -248,6 +248,130 @@ struct QuakeWatchTests {
         }
     }
     
+    @Test func earthquakeListFeatureToggleFilter() async throws {
+        let store = TestStore(initialState: EarthquakeListFeature.State()) {
+            EarthquakeListFeature()
+        }
+        
+        #expect(store.state.filterState.isActive == false)
+        
+        await store.send(.toggleFilter) {
+            $0.filterState.isActive = true
+        }
+        
+        await store.send(.toggleFilter) {
+            $0.filterState.isActive = false
+        }
+    }
+    
+    @Test func earthquakeListFeatureSetMagnitudeRange() async throws {
+        let store = TestStore(initialState: EarthquakeListFeature.State()) {
+            EarthquakeListFeature()
+        }
+        
+        let newRange = 2.0...6.0
+        await store.send(.setMagnitudeRange(newRange)) {
+            $0.filterState.magnitudeRange = newRange
+        }
+    }
+    
+    @Test func earthquakeListFeatureSetTimeFilter() async throws {
+        let store = TestStore(initialState: EarthquakeListFeature.State()) {
+            EarthquakeListFeature()
+        }
+        
+        await store.send(.setTimeFilter(.pastDay)) {
+            $0.filterState.timeFilter = .pastDay
+        }
+    }
+    
+    @Test func earthquakeListFeatureSetLocationSearch() async throws {
+        let store = TestStore(initialState: EarthquakeListFeature.State()) {
+            EarthquakeListFeature()
+        }
+        
+        await store.send(.setLocationSearch("California")) {
+            $0.filterState.locationSearch = "California"
+        }
+    }
+    
+    @Test func earthquakeListFeatureClearFilters() async throws {
+        var initialState = EarthquakeListFeature.State()
+        initialState.filterState.isActive = true
+        initialState.filterState.magnitudeRange = 2.0...6.0
+        initialState.filterState.timeFilter = .pastDay
+        initialState.filterState.locationSearch = "California"
+        
+        let store = TestStore(initialState: initialState) {
+            EarthquakeListFeature()
+        }
+        
+        await store.send(.clearFilters) {
+            $0.filterState = EarthquakeListFeature.State.FilterState()
+        }
+    }
+    
+    @Test func earthquakeFilteringLogic() async throws {
+        var state = EarthquakeListFeature.State()
+        
+        // Add test earthquakes with different magnitudes and times
+        let now = Date()
+        let oneHourAgo = now.addingTimeInterval(-3600)
+        let oneDayAgo = now.addingTimeInterval(-86400)
+        
+        state.earthquakes = [
+            Earthquake(from: createTestFeatureWithDetails(magnitude: 2.0, location: "California", time: oneHourAgo)),
+            Earthquake(from: createTestFeatureWithDetails(magnitude: 5.0, location: "Alaska", time: oneDayAgo)),
+            Earthquake(from: createTestFeatureWithDetails(magnitude: 7.0, location: "Japan", time: now))
+        ]
+        
+        // Test no filtering (isActive = false)
+        #expect(state.filteredEarthquakes.count == 3)
+        
+        // Test magnitude filtering
+        state.filterState.isActive = true
+        state.filterState.magnitudeRange = 4.0...8.0
+        let magnitudeFiltered = state.filteredEarthquakes
+        #expect(magnitudeFiltered.count == 2) // 5.0 and 7.0 magnitude
+        
+        // Test time filtering
+        state.filterState.magnitudeRange = 0.0...10.0 // Reset magnitude filter
+        state.filterState.timeFilter = .pastHour
+        let timeFiltered = state.filteredEarthquakes
+        #expect(timeFiltered.count == 2) // earthquakes from now and one hour ago
+        
+        // Test location filtering
+        state.filterState.timeFilter = .all // Reset time filter
+        state.filterState.locationSearch = "California"
+        let locationFiltered = state.filteredEarthquakes
+        #expect(locationFiltered.count == 1) // Only California earthquake
+    }
+    
+    @Test func hasActiveFiltersLogic() async throws {
+        var state = EarthquakeListFeature.State()
+        
+        // No active filters
+        #expect(state.hasActiveFilters == false)
+        
+        // Active but no changes
+        state.filterState.isActive = true
+        #expect(state.hasActiveFilters == false)
+        
+        // Active with magnitude change
+        state.filterState.magnitudeRange = 2.0...6.0
+        #expect(state.hasActiveFilters == true)
+        
+        // Reset and test time filter
+        state.filterState.magnitudeRange = 0.0...10.0
+        state.filterState.timeFilter = .pastDay
+        #expect(state.hasActiveFilters == true)
+        
+        // Reset and test location search
+        state.filterState.timeFilter = .all
+        state.filterState.locationSearch = "California"
+        #expect(state.hasActiveFilters == true)
+    }
+    
     private func createTestFeature(magnitude: Double) -> EarthquakeFeature {
         EarthquakeFeature(
             type: "Feature",
@@ -284,6 +408,45 @@ struct QuakeWatchTests {
                 coordinates: [-118.123, 34.123, 10.0]
             ),
             id: "test-earthquake-\(magnitude)"
+        )
+    }
+    
+    private func createTestFeatureWithDetails(magnitude: Double, location: String, time: Date) -> EarthquakeFeature {
+        EarthquakeFeature(
+            type: "Feature",
+            properties: EarthquakeProperties(
+                mag: magnitude,
+                place: location,
+                time: Int(time.timeIntervalSince1970 * 1000),
+                updated: Int(Date().timeIntervalSince1970 * 1000),
+                tz: nil,
+                url: "https://test.com",
+                detail: "https://test.com/detail",
+                felt: nil,
+                cdi: nil,
+                mmi: nil,
+                alert: nil,
+                status: "reviewed",
+                tsunami: 0,
+                sig: 314,
+                net: "ci",
+                code: "12345",
+                ids: ",ci12345,",
+                sources: ",ci,",
+                types: ",general-link,origin,phase-data,",
+                nst: nil,
+                dmin: nil,
+                rms: nil,
+                gap: nil,
+                magType: "ml",
+                type: "earthquake",
+                title: "Test Earthquake"
+            ),
+            geometry: EarthquakeGeometry(
+                type: "Point",
+                coordinates: [-118.123, 34.123, 10.0]
+            ),
+            id: "test-earthquake-\(magnitude)-\(location.replacingOccurrences(of: " ", with: "-"))"
         )
     }
 }

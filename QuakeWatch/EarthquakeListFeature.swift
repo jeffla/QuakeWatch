@@ -17,6 +17,32 @@ struct EarthquakeListFeature {
         var errorMessage: String?
         var lastUpdated: Date?
         @Presents var selectedEarthquake: EarthquakeDetailFeature.State?
+        var filterState = FilterState()
+        
+        struct FilterState: Equatable {
+            var isActive = false
+            var magnitudeRange: ClosedRange<Double> = 0.0...10.0
+            var timeFilter: TimeFilter = .all
+            var locationSearch: String = ""
+            
+            enum TimeFilter: String, CaseIterable {
+                case all = "All Time"
+                case pastHour = "Past Hour"
+                case pastDay = "Past Day"
+                case pastWeek = "Past Week"
+                case pastMonth = "Past Month"
+                
+                var timeInterval: TimeInterval? {
+                    switch self {
+                    case .all: return nil
+                    case .pastHour: return 3600
+                    case .pastDay: return 86400
+                    case .pastWeek: return 604800
+                    case .pastMonth: return 2592000
+                    }
+                }
+            }
+        }
     }
     
     enum Action {
@@ -25,6 +51,11 @@ struct EarthquakeListFeature {
         case earthquakesResponse(Result<[Earthquake], Error>)
         case earthquakeSelected(Earthquake)
         case earthquakeDetail(PresentationAction<EarthquakeDetailFeature.Action>)
+        case toggleFilter
+        case setMagnitudeRange(ClosedRange<Double>)
+        case setTimeFilter(State.FilterState.TimeFilter)
+        case setLocationSearch(String)
+        case clearFilters
     }
     
     @Dependency(\.earthquakeClient) var earthquakeClient
@@ -63,6 +94,26 @@ struct EarthquakeListFeature {
                 
             case .earthquakeDetail:
                 return .none
+                
+            case .toggleFilter:
+                state.filterState.isActive.toggle()
+                return .none
+                
+            case let .setMagnitudeRange(range):
+                state.filterState.magnitudeRange = range
+                return .none
+                
+            case let .setTimeFilter(timeFilter):
+                state.filterState.timeFilter = timeFilter
+                return .none
+                
+            case let .setLocationSearch(search):
+                state.filterState.locationSearch = search
+                return .none
+                
+            case .clearFilters:
+                state.filterState = State.FilterState()
+                return .none
             }
         }
         .ifLet(\.$selectedEarthquake, action: \.earthquakeDetail) {
@@ -73,7 +124,42 @@ struct EarthquakeListFeature {
 
 extension EarthquakeListFeature.State {
     var sortedEarthquakes: [Earthquake] {
-        earthquakes.sorted { $0.time > $1.time }
+        let filtered = filteredEarthquakes
+        return filtered.sorted { $0.time > $1.time }
+    }
+    
+    var filteredEarthquakes: [Earthquake] {
+        guard filterState.isActive else {
+            return earthquakes
+        }
+        
+        return earthquakes.filter { earthquake in
+            // Magnitude filter
+            let magnitudeMatch = filterState.magnitudeRange.contains(earthquake.magnitude)
+            
+            // Time filter
+            let timeMatch: Bool
+            if let timeInterval = filterState.timeFilter.timeInterval {
+                let cutoffDate = Date().addingTimeInterval(-timeInterval)
+                timeMatch = earthquake.time >= cutoffDate
+            } else {
+                timeMatch = true
+            }
+            
+            // Location filter
+            let locationMatch = filterState.locationSearch.isEmpty ||
+                earthquake.location.localizedCaseInsensitiveContains(filterState.locationSearch)
+            
+            return magnitudeMatch && timeMatch && locationMatch
+        }
+    }
+    
+    var hasActiveFilters: Bool {
+        filterState.isActive && (
+            filterState.magnitudeRange != 0.0...10.0 ||
+            filterState.timeFilter != .all ||
+            !filterState.locationSearch.isEmpty
+        )
     }
     
     var lastUpdatedText: String {
