@@ -7,6 +7,7 @@
 
 import Testing
 import ComposableArchitecture
+import Foundation
 @testable import QuakeWatch
 
 @MainActor
@@ -206,6 +207,45 @@ struct QuakeWatchTests {
         #expect(strongEarthquake.magnitudeCategory == .strong)
         #expect(majorEarthquake.magnitudeCategory == .major)
         #expect(greatEarthquake.magnitudeCategory == .great)
+    }
+    
+    @Test func earthquakeDetailFeatureInitialization() async throws {
+        let earthquake = Earthquake(from: createTestFeature(magnitude: 4.5))
+        let state = EarthquakeDetailFeature.State(earthquake: earthquake)
+        
+        #expect(state.earthquake.id == earthquake.id)
+        #expect(state.earthquake.magnitude == 4.5)
+        #expect(state.isOpeningURL == false)
+    }
+    
+    @Test func earthquakeDetailFeatureOpenUSGSLink() async throws {
+        let earthquake = Earthquake(from: createTestFeature(magnitude: 4.5))
+        let store = TestStore(initialState: EarthquakeDetailFeature.State(earthquake: earthquake)) {
+            EarthquakeDetailFeature()
+        } withDependencies: {
+            $0.openURL = OpenURLEffect { _ in return true }
+        }
+        
+        await store.send(.openUSGSLink) {
+            $0.isOpeningURL = true
+        }
+        
+        await store.receive(\.urlOpeningComplete) {
+            $0.isOpeningURL = false
+        }
+    }
+    
+    @Test func earthquakeListFeatureNavigation() async throws {
+        let earthquake = Earthquake(from: createTestFeature(magnitude: 4.5))
+        let store = TestStore(initialState: EarthquakeListFeature.State()) {
+            EarthquakeListFeature()
+        } withDependencies: {
+            $0.earthquakeClient = .testValue
+        }
+        
+        await store.send(.earthquakeSelected(earthquake)) {
+            $0.selectedEarthquake = EarthquakeDetailFeature.State(earthquake: earthquake)
+        }
     }
     
     private func createTestFeature(magnitude: Double) -> EarthquakeFeature {

@@ -16,12 +16,15 @@ struct EarthquakeListFeature {
         var isLoading = false
         var errorMessage: String?
         var lastUpdated: Date?
+        @Presents var selectedEarthquake: EarthquakeDetailFeature.State?
     }
     
     enum Action {
         case onAppear
         case refresh
         case earthquakesResponse(Result<[Earthquake], Error>)
+        case earthquakeSelected(Earthquake)
+        case earthquakeDetail(PresentationAction<EarthquakeDetailFeature.Action>)
     }
     
     @Dependency(\.earthquakeClient) var earthquakeClient
@@ -53,7 +56,17 @@ struct EarthquakeListFeature {
                 state.isLoading = false
                 state.errorMessage = "Failed to load earthquakes: \(error.localizedDescription)"
                 return .none
+                
+            case let .earthquakeSelected(earthquake):
+                state.selectedEarthquake = EarthquakeDetailFeature.State(earthquake: earthquake)
+                return .none
+                
+            case .earthquakeDetail:
+                return .none
             }
+        }
+        .ifLet(\.$selectedEarthquake, action: \.earthquakeDetail) {
+            EarthquakeDetailFeature()
         }
     }
 }

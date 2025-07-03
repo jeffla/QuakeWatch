@@ -51,7 +51,10 @@ struct EarthquakeListView: View {
                     }
                 } else {
                     List(viewStore.sortedEarthquakes) { earthquake in
-                        EarthquakeRowView(earthquake: earthquake)
+                        Button(action: { viewStore.send(.earthquakeSelected(earthquake)) }) {
+                            EarthquakeRowView(earthquake: earthquake)
+                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
                     .refreshable {
                         viewStore.send(.refresh)
@@ -84,6 +87,20 @@ struct EarthquakeListView: View {
                         viewStore.send(.refresh)
                     }
                     .disabled(viewStore.isLoading)
+                }
+            }
+            .sheet(
+                store: store.scope(state: \.$selectedEarthquake, action: \.earthquakeDetail)
+            ) { detailStore in
+                NavigationView {
+                    EarthquakeDetailView(store: detailStore)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                Button("Done") {
+                                    viewStore.send(.earthquakeDetail(.dismiss))
+                                }
+                            }
+                        }
                 }
             }
         }
