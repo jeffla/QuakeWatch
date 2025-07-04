@@ -146,8 +146,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Screenshots
 
-*Add screenshots of your app here to showcase the different views and features*
+![Simulator Screenshot - iPhone 16 Pro - 2025-07-03 at 19 42 42](https://github.com/user-attachments/assets/be8fc9b8-3758-4e3f-b85c-94ebe894cac2)
+
+![Simulator Screenshot - iPhone 16 Pro - 2025-07-03 at 19 43 02](https://github.com/user-attachments/assets/8881de96-40f7-408b-8ea6-a3f49ab00e22)
+
+![Simulator Screenshot - iPhone 16 Pro - 2025-07-03 at 18 17 50](https://github.com/user-attachments/assets/d5d7f12a-6337-4425-95fc-360c7b8198fb)
 
 ---
-
 **Note**: This app is for educational and informational purposes. For official earthquake information and alerts, please refer to your local geological survey or emergency management agency.
