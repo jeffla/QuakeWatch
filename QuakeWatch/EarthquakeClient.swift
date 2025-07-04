@@ -11,15 +11,57 @@ import ComposableArchitecture
 @DependencyClient
 struct EarthquakeClient {
     var fetchEarthquakes: @Sendable () async throws -> [Earthquake]
+    var isOnline: @Sendable () async -> Bool = { false }
 }
 
 extension EarthquakeClient: DependencyKey {
     static let liveValue = EarthquakeClient(
         fetchEarthquakes: {
-            let url = URL(string: "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson")!
-            let (data, _) = try await URLSession.shared.data(from: url)
-            let response = try JSONDecoder().decode(EarthquakeResponse.self, from: data)
-            return response.features.map(Earthquake.init)
+            @Dependency(\.cacheManager) var cacheManager
+            
+            let cacheValidDuration: TimeInterval = 300 // 5 minutes
+            
+            // Check if we have valid cached data
+            if await cacheManager.isCacheValid(cacheValidDuration) {
+                let cachedEarthquakes = try await cacheManager.loadEarthquakes()
+                if !cachedEarthquakes.isEmpty {
+                    return cachedEarthquakes
+                }
+            }
+            
+            do {
+                // Try to fetch fresh data from the API
+                let url = URL(string: "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson")!
+                let (data, _) = try await URLSession.shared.data(from: url)
+                let response = try JSONDecoder().decode(EarthquakeResponse.self, from: data)
+                let earthquakes = response.features.map(Earthquake.init)
+                
+                // Cache the fresh data
+                try await cacheManager.saveEarthquakes(earthquakes)
+                
+                return earthquakes
+            } catch {
+                // If network fails, try to load from cache regardless of age
+                let cachedEarthquakes = try await cacheManager.loadEarthquakes()
+                if !cachedEarthquakes.isEmpty {
+                    return cachedEarthquakes
+                }
+                
+                // If no cached data exists, rethrow the original error
+                throw error
+            }
+        },
+        isOnline: {
+            guard let url = URL(string: "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson") else {
+                return false
+            }
+            
+            do {
+                let (_, response) = try await URLSession.shared.data(from: url)
+                return (response as? HTTPURLResponse)?.statusCode == 200
+            } catch {
+                return false
+            }
         }
     )
     
@@ -63,7 +105,8 @@ extension EarthquakeClient: DependencyKey {
                     id: "test-earthquake-1"
                 ))
             ]
-        }
+        },
+        isOnline: { true }
     )
     
     static let previewValue = EarthquakeClient(
@@ -178,7 +221,8 @@ extension EarthquakeClient: DependencyKey {
                     id: "nc11223"
                 ))
             ]
-        }
+        },
+        isOnline: { true }
     )
 }
 

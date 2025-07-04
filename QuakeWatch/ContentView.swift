@@ -118,6 +118,21 @@ struct EarthquakeListView: View {
             .onAppear {
                 viewStore.send(.onAppear)
             }
+            .overlay(alignment: .top) {
+                if !viewStore.isOnline {
+                    HStack {
+                        Image(systemName: "wifi.slash")
+                        Text(viewStore.isUsingCachedData ? "Offline - Showing cached data" : "Offline")
+                    }
+                    .font(.caption)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.orange)
+                    .cornerRadius(12)
+                    .padding(.top, 8)
+                }
+            }
             .overlay(alignment: .bottom) {
                 if viewStore.isLoading && !viewStore.earthquakes.isEmpty {
                     HStack {

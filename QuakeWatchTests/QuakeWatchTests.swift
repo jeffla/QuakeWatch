@@ -744,4 +744,176 @@ struct QuakeWatchTests {
             $0.selectedTab = .list
         }
     }
+    
+    // MARK: - Cache and Offline Tests
+    
+    @Test func earthquakeListFeatureOnlineStatusCheck() async throws {
+        let store = TestStore(initialState: EarthquakeListFeature.State()) {
+            EarthquakeListFeature()
+        } withDependencies: {
+            $0.earthquakeClient.isOnline = { true }
+        }
+        
+        await store.send(.checkOnlineStatus)
+        
+        await store.receive(\.onlineStatusResponse) {
+            $0.isOnline = true
+        }
+    }
+    
+    @Test func earthquakeListFeatureOfflineStatusCheck() async throws {
+        let store = TestStore(initialState: EarthquakeListFeature.State()) {
+            EarthquakeListFeature()
+        } withDependencies: {
+            $0.earthquakeClient.isOnline = { false }
+        }
+        
+        await store.send(.checkOnlineStatus)
+        
+        await store.receive(\.onlineStatusResponse) {
+            $0.isOnline = false
+        }
+    }
+    
+    @Test func earthquakeListFeatureOfflineWithCache() async throws {
+        let cachedEarthquake = Earthquake(from: createTestFeature(magnitude: 3.2))
+        
+        let store = TestStore(initialState: EarthquakeListFeature.State()) {
+            EarthquakeListFeature()
+        } withDependencies: {
+            $0.earthquakeClient.fetchEarthquakes = { [cachedEarthquake] }
+            $0.earthquakeClient.isOnline = { false }
+            $0.cacheManager = .testValue
+        }
+        
+        await store.send(.refresh) {
+            $0.isLoading = true
+            $0.errorMessage = nil
+        }
+        
+        await store.receive(\.checkOnlineStatus)
+        
+        await store.receive(\.onlineStatusResponse) {
+            $0.isOnline = false
+        }
+        
+        await store.receive(\.earthquakesResponse.success) {
+            $0.isLoading = false
+            $0.earthquakes = [cachedEarthquake]
+            $0.lastUpdated = Date()
+            $0.isUsingCachedData = true
+        }
+    }
+    
+    @Test func earthquakeMapFeatureOnlineStatusCheck() async throws {
+        let store = TestStore(initialState: EarthquakeMapFeature.State()) {
+            EarthquakeMapFeature()
+        } withDependencies: {
+            $0.earthquakeClient.isOnline = { true }
+        }
+        
+        await store.send(.checkOnlineStatus)
+        
+        await store.receive(\.onlineStatusResponse) {
+            $0.isOnline = true
+        }
+    }
+    
+    @Test func earthquakeMapFeatureOfflineWithCache() async throws {
+        let cachedEarthquake = Earthquake(from: createTestFeature(magnitude: 4.1))
+        
+        let store = TestStore(initialState: EarthquakeMapFeature.State()) {
+            EarthquakeMapFeature()
+        } withDependencies: {
+            $0.earthquakeClient.fetchEarthquakes = { [cachedEarthquake] }
+            $0.earthquakeClient.isOnline = { false }
+            $0.cacheManager = .testValue
+        }
+        
+        await store.send(.refresh) {
+            $0.isLoading = true
+            $0.errorMessage = nil
+        }
+        
+        await store.receive(\.checkOnlineStatus)
+        
+        await store.receive(\.onlineStatusResponse) {
+            $0.isOnline = false
+        }
+        
+        await store.receive(\.earthquakesResponse.success) {
+            $0.isLoading = false
+            $0.earthquakes = [cachedEarthquake]
+            $0.lastUpdated = Date()
+            $0.isUsingCachedData = true
+            $0.mapRegion.center.latitude = cachedEarthquake.latitude
+            $0.mapRegion.center.longitude = cachedEarthquake.longitude
+        }
+    }
+    
+    @Test func cacheManagerSaveAndLoad() async throws {
+        let testEarthquakes = [
+            Earthquake(from: createTestFeature(magnitude: 5.2)),
+            Earthquake(from: createTestFeature(magnitude: 3.8))
+        ]
+        
+        // Test that cache manager can save and load earthquakes
+        let cacheManager = CacheManager.liveValue
+        
+        try await cacheManager.saveEarthquakes(testEarthquakes)
+        let loadedEarthquakes = try await cacheManager.loadEarthquakes()
+        
+        #expect(loadedEarthquakes.count == testEarthquakes.count)
+        #expect(loadedEarthquakes[0].magnitude == testEarthquakes[0].magnitude)
+        #expect(loadedEarthquakes[1].magnitude == testEarthquakes[1].magnitude)
+        
+        // Clean up
+        try await cacheManager.clearCache()
+    }
+    
+    @Test func cacheManagerTimestamp() async throws {
+        let cacheManager = CacheManager.liveValue
+        
+        // Initially no timestamp should exist
+        let initialTimestamp = await cacheManager.getCacheTimestamp()
+        #expect(initialTimestamp == nil)
+        
+        // Save some data
+        let testEarthquakes = [Earthquake(from: createTestFeature(magnitude: 2.5))]
+        try await cacheManager.saveEarthquakes(testEarthquakes)
+        
+        // Now timestamp should exist
+        let savedTimestamp = await cacheManager.getCacheTimestamp()
+        #expect(savedTimestamp != nil)
+        
+        // Clean up
+        try await cacheManager.clearCache()
+        
+        // After clearing, timestamp should be gone
+        let clearedTimestamp = await cacheManager.getCacheTimestamp()
+        #expect(clearedTimestamp == nil)
+    }
+    
+    @Test func cacheManagerValidityCheck() async throws {
+        let cacheManager = CacheManager.liveValue
+        
+        // Initially cache should not be valid
+        let initialValid = await cacheManager.isCacheValid(300) // 5 minutes
+        #expect(initialValid == false)
+        
+        // Save some data
+        let testEarthquakes = [Earthquake(from: createTestFeature(magnitude: 6.1))]
+        try await cacheManager.saveEarthquakes(testEarthquakes)
+        
+        // Immediately after saving, should be valid
+        let validAfterSave = await cacheManager.isCacheValid(300)
+        #expect(validAfterSave == true)
+        
+        // Should not be valid for very short duration (simulating expired cache)
+        let expiredCache = await cacheManager.isCacheValid(0.001) // 1 millisecond
+        #expect(expiredCache == false)
+        
+        // Clean up
+        try await cacheManager.clearCache()
+    }
 }

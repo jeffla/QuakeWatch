@@ -63,7 +63,7 @@ struct EarthquakeGeometry: Codable {
     let coordinates: [Double]
 }
 
-struct Earthquake: Identifiable, Equatable {
+struct Earthquake: Identifiable, Equatable, Codable {
     let id: String
     let magnitude: Double
     let location: String

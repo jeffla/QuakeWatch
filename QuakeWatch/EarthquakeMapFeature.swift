@@ -17,6 +17,8 @@ struct EarthquakeMapFeature {
         var isLoading = false
         var errorMessage: String?
         var lastUpdated: Date?
+        var isOnline = true
+        var isUsingCachedData = false
         var selectedEarthquake: Earthquake?
         @Presents var earthquakeDetail: EarthquakeDetailFeature.State?
         var mapRegion = MKCoordinateRegion(
@@ -29,6 +31,8 @@ struct EarthquakeMapFeature {
             lhs.isLoading == rhs.isLoading &&
             lhs.errorMessage == rhs.errorMessage &&
             lhs.lastUpdated == rhs.lastUpdated &&
+            lhs.isOnline == rhs.isOnline &&
+            lhs.isUsingCachedData == rhs.isUsingCachedData &&
             lhs.selectedEarthquake == rhs.selectedEarthquake &&
             lhs.$earthquakeDetail == rhs.$earthquakeDetail &&
             lhs.mapRegion.center.latitude == rhs.mapRegion.center.latitude &&
@@ -44,9 +48,12 @@ struct EarthquakeMapFeature {
         case earthquakesResponse(Result<[Earthquake], Error>)
         case earthquakeSelected(Earthquake)
         case earthquakeDetail(PresentationAction<EarthquakeDetailFeature.Action>)
+        case checkOnlineStatus
+        case onlineStatusResponse(Bool)
     }
     
     @Dependency(\.earthquakeClient) var earthquakeClient
+    @Dependency(\.cacheManager) var cacheManager
     
     var body: some ReducerOf<Self> {
         Reduce { state, action in
@@ -59,6 +66,10 @@ struct EarthquakeMapFeature {
                 state.isLoading = true
                 state.errorMessage = nil
                 return .run { send in
+                    // Check online status first
+                    await send(.checkOnlineStatus)
+                    
+                    // Fetch earthquakes (will use cache if offline)
                     await send(.earthquakesResponse(
                         Result { try await earthquakeClient.fetchEarthquakes() }
                     ))
@@ -69,6 +80,9 @@ struct EarthquakeMapFeature {
                 state.earthquakes = earthquakes.sorted { $0.time > $1.time }
                 state.lastUpdated = Date()
                 state.errorMessage = nil
+                
+                // Detect if we're using cached data (when offline and we have cached data)
+                state.isUsingCachedData = !state.isOnline && !earthquakes.isEmpty
                 
                 // Update map region to show all earthquakes
                 if !earthquakes.isEmpty {
@@ -91,6 +105,16 @@ struct EarthquakeMapFeature {
                 return .none
                 
             case .earthquakeDetail:
+                return .none
+                
+            case .checkOnlineStatus:
+                return .run { send in
+                    let isOnline = await earthquakeClient.isOnline()
+                    await send(.onlineStatusResponse(isOnline))
+                }
+                
+            case let .onlineStatusResponse(isOnline):
+                state.isOnline = isOnline
                 return .none
             }
         }

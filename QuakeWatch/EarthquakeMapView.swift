@@ -65,6 +65,24 @@ struct EarthquakeMapView: View {
                     .shadow(radius: 2)
                 }
                 
+                // Offline indicator
+                if !viewStore.isOnline {
+                    VStack {
+                        HStack {
+                            Image(systemName: "wifi.slash")
+                            Text(viewStore.isUsingCachedData ? "Offline - Showing cached data" : "Offline")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.orange)
+                        .cornerRadius(12)
+                        Spacer()
+                    }
+                    .padding(.top, 8)
+                }
+                
                 // Refresh indicator
                 if viewStore.isLoading && !viewStore.earthquakes.isEmpty {
                     VStack {

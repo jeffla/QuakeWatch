@@ -16,6 +16,8 @@ struct EarthquakeListFeature {
         var isLoading = false
         var errorMessage: String?
         var lastUpdated: Date?
+        var isOnline = true
+        var isUsingCachedData = false
         @Presents var selectedEarthquake: EarthquakeDetailFeature.State?
         var filterState = FilterState()
         
@@ -56,9 +58,12 @@ struct EarthquakeListFeature {
         case setTimeFilter(State.FilterState.TimeFilter)
         case setLocationSearch(String)
         case clearFilters
+        case checkOnlineStatus
+        case onlineStatusResponse(Bool)
     }
     
     @Dependency(\.earthquakeClient) var earthquakeClient
+    @Dependency(\.cacheManager) var cacheManager
     
     var body: some ReducerOf<Self> {
         Reduce { state, action in
@@ -71,6 +76,10 @@ struct EarthquakeListFeature {
                 state.isLoading = true
                 state.errorMessage = nil
                 return .run { send in
+                    // Check online status first
+                    await send(.checkOnlineStatus)
+                    
+                    // Fetch earthquakes (will use cache if offline)
                     await send(.earthquakesResponse(
                         Result { try await earthquakeClient.fetchEarthquakes() }
                     ))
@@ -81,6 +90,10 @@ struct EarthquakeListFeature {
                 state.earthquakes = earthquakes.sorted { $0.time > $1.time }
                 state.lastUpdated = Date()
                 state.errorMessage = nil
+                
+                // Detect if we're using cached data (when offline and we have cached data)
+                state.isUsingCachedData = !state.isOnline && !earthquakes.isEmpty
+                
                 return .none
                 
             case let .earthquakesResponse(.failure(error)):
@@ -113,6 +126,16 @@ struct EarthquakeListFeature {
                 
             case .clearFilters:
                 state.filterState = State.FilterState()
+                return .none
+                
+            case .checkOnlineStatus:
+                return .run { send in
+                    let isOnline = await earthquakeClient.isOnline()
+                    await send(.onlineStatusResponse(isOnline))
+                }
+                
+            case let .onlineStatusResponse(isOnline):
+                state.isOnline = isOnline
                 return .none
             }
         }
